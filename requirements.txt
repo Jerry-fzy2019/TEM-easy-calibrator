@@ -1,0 +1,28 @@
+# Core dependencies
+opencv-python
+numpy<2.0
+matplotlib
+Pillow
+tifffile
+
+# Scientific computing
+scikit-image>=0.21.0
+
+# Data processing
+pandas>=2.0.0
+openpyxl>=3.1.0
+
+# Web UI
+streamlit==1.29.0
+plotly>=5.17.0
+streamlit-drawable-canvas
+
+# File handling
+aiofiles>=23.0.0
+
+# DM3 file support
+hyperspy>=1.7.0
+
+# Desktop packaging
+pywebview>=4.4.1
+pyinstaller>=5.13.0
