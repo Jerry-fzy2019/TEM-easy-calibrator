@@ -1,0 +1,5 @@
+# Optional DM3 metadata support
+#
+# HyperSpy is licensed under GPLv3. Install this file only if you need
+# DM3 metadata extraction for pixel scale auto-fill.
+hyperspy>=1.7.0

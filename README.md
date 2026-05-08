@@ -22,7 +22,13 @@ TEM Easy Calibrator 是一个面向透射电子显微镜（TEM）图像的交互
 - `.png`
 - `.jpg` / `.jpeg`
 
-部分页面预留了 `.dm3` 入口，并会尝试通过 HyperSpy 读取 DM3 元数据中的像素比例。DM3 文件的实际图像读取兼容性会受文件来源和依赖版本影响，建议优先使用 TIF/TIFF 作为开源示例格式。
+部分页面预留了 `.dm3` 入口。核心功能不依赖 DM3 支持；如果需要从 DM3 元数据中自动读取像素比例，可以额外安装可选依赖：
+
+```bash
+pip install -r requirements-dm3.txt
+```
+
+DM3 元数据读取会使用 HyperSpy。HyperSpy 采用 GPLv3 许可证，因此它被拆分为可选依赖，未包含在主依赖 `requirements.txt` 中。
 
 ## 快速开始
 
@@ -90,7 +96,9 @@ python main.py
 ```text
 .
 ├── main.py                         # 桌面入口，使用 pywebview 承载 Streamlit
-├── requirements.txt                # Python 依赖
+├── requirements.txt                # 主依赖
+├── requirements-dm3.txt            # 可选 DM3 元数据读取依赖
+├── LICENSE                         # Apache-2.0 许可证
 └── src
     ├── core                        # 核心算法与图像处理逻辑
     │   ├── common                  # 通用像素比例换算、视觉工具
@@ -120,16 +128,11 @@ python -m compileall -q .
 - TIF/PNG/JPG 图像是否能上传。
 - 像素比例换算、画线和结果展示是否符合预期。
 
-## 开源前建议
-
-- 添加 `LICENSE` 文件，明确开源许可证。
-- 添加 `.gitignore`，忽略 `__pycache__/`、`.pyc`、虚拟环境和本地缓存。
-- 补充一组脱敏的示例图片或截图，方便用户快速理解输入和输出。
-- 如果计划发布桌面版，可以补充 PyInstaller 打包脚本和发布流程。
-
 ## 许可证
 
-当前仓库尚未包含许可证文件。正式开源前请先选择并添加许可证，例如 MIT、BSD-3-Clause、Apache-2.0 或 GPL-3.0。
+本项目采用 Apache License 2.0 开源。详见 [LICENSE](LICENSE)。
+
+DM3 元数据读取是可选功能，依赖 HyperSpy。HyperSpy 采用 GPLv3 许可证；如果你安装 `requirements-dm3.txt` 并分发包含 HyperSpy 的版本，请同时遵守 HyperSpy 的许可证要求。
 
 ## 贡献
 

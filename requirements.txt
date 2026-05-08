@@ -20,9 +20,6 @@ streamlit-drawable-canvas
 # File handling
 aiofiles>=23.0.0
 
-# DM3 file support
-hyperspy>=1.7.0
-
 # Desktop packaging
 pywebview>=4.4.1
 pyinstaller>=5.13.0
