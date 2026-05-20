@@ -12,15 +12,15 @@ import os
 import subprocess
 import sys
 import time
+import traceback
 import urllib.request
 from pathlib import Path
-
-import webview
 
 
 STREAMLIT_PORT = 8502
 SERVER_FLAG = "--tem-streamlit-server"
 streamlit_process: subprocess.Popen | None = None
+log_handle = None
 
 
 def is_frozen() -> bool:
@@ -37,12 +37,36 @@ def streamlit_app_path() -> Path:
     return base_path() / "src" / "ui_streamlit" / "app.py"
 
 
+def app_data_path() -> Path:
+    if sys.platform.startswith("win"):
+        root = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+        if root:
+            return Path(root) / "TEM Easy Calibrator"
+    return Path.home() / ".tem-easy-calibrator"
+
+
+def log_path() -> Path:
+    return app_data_path() / "logs" / "launcher.log"
+
+
+def write_log(message: str) -> None:
+    try:
+        path = log_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        with path.open("a", encoding="utf-8") as file:
+            file.write(f"[{timestamp}] {message}\n")
+    except Exception:
+        pass
+
+
 def configure_streamlit() -> None:
     os.environ["STREAMLIT_SERVER_PORT"] = str(STREAMLIT_PORT)
     os.environ["STREAMLIT_SERVER_ADDRESS"] = "localhost"
     os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
     os.environ["STREAMLIT_SERVER_HEADLESS"] = "true"
     os.environ["STREAMLIT_THEME_BASE"] = "light"
+    os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"
 
 
 def run_streamlit_server() -> None:
@@ -50,15 +74,25 @@ def run_streamlit_server() -> None:
 
     This is used by the child process created from a frozen PyInstaller app.
     """
-    configure_streamlit()
-    from streamlit.web import bootstrap
+    try:
+        configure_streamlit()
+        app_path = streamlit_app_path()
+        write_log(f"Starting Streamlit server. frozen={is_frozen()} app_path={app_path}")
+        if not app_path.exists():
+            raise FileNotFoundError(f"Streamlit app was not found: {app_path}")
 
-    bootstrap.run(str(streamlit_app_path()), False, [], {})
+        from streamlit.web import bootstrap
+
+        write_log("Streamlit bootstrap imported.")
+        bootstrap.run(str(app_path), False, [], {})
+    except Exception:
+        write_log("Streamlit server failed:\n" + traceback.format_exc())
+        raise
 
 
 def start_streamlit() -> None:
     """Start the Streamlit server as a child process."""
-    global streamlit_process
+    global log_handle, streamlit_process
     configure_streamlit()
 
     if is_frozen():
@@ -80,10 +114,17 @@ def start_streamlit() -> None:
     if sys.platform.startswith("win") and hasattr(subprocess, "CREATE_NO_WINDOW"):
         popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
+    if is_frozen():
+        log_path().parent.mkdir(parents=True, exist_ok=True)
+        log_handle = log_path().open("a", encoding="utf-8")
+        popen_kwargs["stdout"] = log_handle
+        popen_kwargs["stderr"] = subprocess.STDOUT
+
+    write_log(f"Launching Streamlit process: {cmd}")
     streamlit_process = subprocess.Popen(cmd, **popen_kwargs)
 
 
-def wait_until_ready(timeout_seconds: float = 20.0) -> bool:
+def wait_until_ready(timeout_seconds: float = 60.0) -> bool:
     url = f"http://localhost:{STREAMLIT_PORT}"
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
@@ -96,7 +137,7 @@ def wait_until_ready(timeout_seconds: float = 20.0) -> bool:
 
 
 def stop_streamlit() -> None:
-    global streamlit_process
+    global log_handle, streamlit_process
     if streamlit_process is None:
         return
 
@@ -110,6 +151,12 @@ def stop_streamlit() -> None:
             pass
     finally:
         streamlit_process = None
+        if log_handle is not None:
+            try:
+                log_handle.close()
+            except Exception:
+                pass
+            log_handle = None
 
 
 def main() -> None:
@@ -117,14 +164,18 @@ def main() -> None:
         run_streamlit_server()
         return
 
+    write_log(f"Launcher started. frozen={is_frozen()} executable={sys.executable}")
     start_streamlit()
 
     if not wait_until_ready():
         stop_streamlit()
-        print("Error: Streamlit server startup timed out.")
+        write_log("Streamlit server startup timed out.")
+        print(f"Error: Streamlit server startup timed out. See log: {log_path()}")
         return
 
     try:
+        import webview
+
         webview.create_window(
             title="TEM Easy Calibrator",
             url=f"http://localhost:{STREAMLIT_PORT}",
