@@ -59,7 +59,7 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-建议使用 Python 3.10 或更新版本。
+建议使用 Python 3.10、3.11 或 3.12。由于当前依赖中包含 `numpy<2.0`，不建议使用 Python 3.13 进行安装或打包。
 
 ### 3. 启动 Web 界面
 
@@ -83,6 +83,46 @@ python main.py
 
 该入口会在后台启动 Streamlit 服务，并在本地桌面窗口中打开应用。
 
+## 安装包与发布
+
+为了让非 Python 用户更容易使用，项目提供了 Windows 桌面版打包配置。发布后可以在 GitHub Releases 中提供两种文件：
+
+- `TEM-Easy-Calibrator-windows-portable.zip`：便携版，解压后直接运行。
+- `TEM-Easy-Calibrator-Setup-版本号.exe`：安装器，可安装到系统程序目录并创建快捷方式。
+
+### 本地打包
+
+Windows PowerShell：
+
+```powershell
+.\scripts\build_windows.ps1
+```
+
+如果只想生成便携版 zip，不生成安装器：
+
+```powershell
+.\scripts\build_windows.ps1 -SkipInstaller
+```
+
+如果需要把 DM3/HyperSpy 支持也打进程序：
+
+```powershell
+.\scripts\build_windows.ps1 -IncludeDm3
+```
+
+> 注意：`-IncludeDm3` 会把 GPLv3 许可证的 HyperSpy 打进发布包。分发该版本时，请同时遵守 HyperSpy 的许可证要求。默认构建不包含 HyperSpy。
+
+### GitHub Actions 自动构建
+
+仓库已包含 `.github/workflows/build-windows.yml`。你可以在 GitHub 页面手动运行 workflow，生成 Windows 便携版和安装器。
+
+如果创建形如 `v0.1.0` 的 tag 并推送到 GitHub，workflow 会自动构建并发布到 GitHub Release：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
 ## 基本使用流程
 
 1. 从左侧导航栏选择分析模块。
@@ -98,7 +138,10 @@ python main.py
 ├── main.py                         # 桌面入口，使用 pywebview 承载 Streamlit
 ├── requirements.txt                # 主依赖
 ├── requirements-dm3.txt            # 可选 DM3 元数据读取依赖
+├── requirements-build.txt          # 打包构建依赖
 ├── LICENSE                         # Apache-2.0 许可证
+├── scripts                         # 本地构建脚本
+├── packaging                       # PyInstaller 与安装器配置
 └── src
     ├── core                        # 核心算法与图像处理逻辑
     │   ├── common                  # 通用像素比例换算、视觉工具

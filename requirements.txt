@@ -22,4 +22,3 @@ aiofiles>=23.0.0
 
 # Desktop packaging
 pywebview>=4.4.1
-pyinstaller>=5.13.0

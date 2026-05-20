@@ -1,94 +1,142 @@
-"""
-TEM Calibrator - 桌面应用主入口
-使用 pywebview 嵌入 Streamlit 应用
+"""Desktop entry point for TEM Easy Calibrator.
+
+This file can run from source or from a PyInstaller bundle. In source mode it
+starts Streamlit with the current Python interpreter. In frozen mode it launches
+a second copy of the bundled executable as the Streamlit server process, then
+opens the local app with pywebview.
 """
 
-import sys
-import threading
-import time
+from __future__ import annotations
+
+import os
 import subprocess
+import sys
+import time
+import urllib.request
 from pathlib import Path
+
 import webview
 
-# 全局变量：保存 Streamlit 子进程句柄，方便在窗口关闭时结束进程
-streamlit_process = None
+
+STREAMLIT_PORT = 8502
+SERVER_FLAG = "--tem-streamlit-server"
+streamlit_process: subprocess.Popen | None = None
 
 
-def start_streamlit():
-    """在后台线程中启动 Streamlit 服务器"""
+def is_frozen() -> bool:
+    return bool(getattr(sys, "frozen", False))
+
+
+def base_path() -> Path:
+    if is_frozen() and hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS)  # type: ignore[attr-defined]
+    return Path(__file__).resolve().parent
+
+
+def streamlit_app_path() -> Path:
+    return base_path() / "src" / "ui_streamlit" / "app.py"
+
+
+def configure_streamlit() -> None:
+    os.environ["STREAMLIT_SERVER_PORT"] = str(STREAMLIT_PORT)
+    os.environ["STREAMLIT_SERVER_ADDRESS"] = "localhost"
+    os.environ["STREAMLIT_BROWSER_GATHER_USAGE_STATS"] = "false"
+    os.environ["STREAMLIT_SERVER_HEADLESS"] = "true"
+    os.environ["STREAMLIT_THEME_BASE"] = "light"
+
+
+def run_streamlit_server() -> None:
+    """Run Streamlit inside the current process.
+
+    This is used by the child process created from a frozen PyInstaller app.
+    """
+    configure_streamlit()
+    from streamlit.web import bootstrap
+
+    bootstrap.run(str(streamlit_app_path()), False, [], {})
+
+
+def start_streamlit() -> None:
+    """Start the Streamlit server as a child process."""
     global streamlit_process
-    # 获取项目根目录
-    base_path = Path(__file__).parent
-    app_path = base_path / "src" / "ui_streamlit" / "app.py"
-    
-    # 设置 Streamlit 配置
-    import os
-    os.environ['STREAMLIT_SERVER_PORT'] = '8502'
-    os.environ['STREAMLIT_SERVER_ADDRESS'] = 'localhost'
-    os.environ['STREAMLIT_BROWSER_GATHER_USAGE_STATS'] = 'false'
-    os.environ['STREAMLIT_SERVER_HEADLESS'] = 'true'
-    os.environ['STREAMLIT_THEME_BASE'] = 'light'
-    
-    # 启动 Streamlit
-    cmd = [
-        sys.executable,
-        "-m", "streamlit", "run",
-        str(app_path),
-        "--server.port=8502",
-        "--server.address=localhost",
-        "--server.headless=true",
-        "--browser.gatherUsageStats=false",
-    ]
-    
-    # 设置工作目录为项目根目录，使用 Popen 启动，后续可以主动关闭
-    streamlit_process = subprocess.Popen(cmd, cwd=str(base_path))
+    configure_streamlit()
 
-def main():
-    """主函数"""
-    # 在后台线程启动 Streamlit
-    streamlit_thread = threading.Thread(target=start_streamlit, daemon=True)
-    streamlit_thread.start()
-    
-    # 等待 Streamlit 启动（最多等待 15 秒）
-    import urllib.request
-    max_wait = 15
-    waited = 0
-    while waited < max_wait:
+    if is_frozen():
+        cmd = [sys.executable, SERVER_FLAG]
+    else:
+        cmd = [
+            sys.executable,
+            "-m",
+            "streamlit",
+            "run",
+            str(streamlit_app_path()),
+            f"--server.port={STREAMLIT_PORT}",
+            "--server.address=localhost",
+            "--server.headless=true",
+            "--browser.gatherUsageStats=false",
+        ]
+
+    popen_kwargs: dict = {"cwd": str(base_path())}
+    if sys.platform.startswith("win") and hasattr(subprocess, "CREATE_NO_WINDOW"):
+        popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+    streamlit_process = subprocess.Popen(cmd, **popen_kwargs)
+
+
+def wait_until_ready(timeout_seconds: float = 20.0) -> bool:
+    url = f"http://localhost:{STREAMLIT_PORT}"
+    deadline = time.time() + timeout_seconds
+    while time.time() < deadline:
         try:
-            # 注意：这里的端口要和上面启动 Streamlit 时保持一致（8502）
-            urllib.request.urlopen('http://localhost:8502', timeout=1)
-            break
-        except:
+            urllib.request.urlopen(url, timeout=1).close()
+            return True
+        except Exception:
             time.sleep(0.5)
-            waited += 0.5
-    
-    if waited >= max_wait:
-        print("错误: Streamlit 服务器启动超时")
+    return False
+
+
+def stop_streamlit() -> None:
+    global streamlit_process
+    if streamlit_process is None:
         return
-    
-    # 创建 webview 窗口（指向 8502 端口，确保使用当前代码）
-    window = webview.create_window(
-        title='TEM 自动化分析系统 v2.0',
-        url='http://localhost:8502',
-        width=1400,
-        height=900,
-        min_size=(1200, 800),
-        resizable=True,
-    )
-    
+
     try:
-        # 启动 webview（阻塞，直到用户关闭窗口）
+        streamlit_process.terminate()
+        streamlit_process.wait(timeout=5)
+    except Exception:
+        try:
+            streamlit_process.kill()
+        except Exception:
+            pass
+    finally:
+        streamlit_process = None
+
+
+def main() -> None:
+    if SERVER_FLAG in sys.argv:
+        run_streamlit_server()
+        return
+
+    start_streamlit()
+
+    if not wait_until_ready():
+        stop_streamlit()
+        print("Error: Streamlit server startup timed out.")
+        return
+
+    try:
+        webview.create_window(
+            title="TEM Easy Calibrator",
+            url=f"http://localhost:{STREAMLIT_PORT}",
+            width=1400,
+            height=900,
+            min_size=(1200, 800),
+            resizable=True,
+        )
         webview.start(debug=False)
     finally:
-        # 窗口关闭后，尝试关闭 Streamlit 子进程，释放 8502 端口
-        global streamlit_process
-        if streamlit_process is not None:
-            try:
-                streamlit_process.terminate()
-                streamlit_process.wait(timeout=5)
-            except Exception:
-                pass
-            streamlit_process = None
+        stop_streamlit()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

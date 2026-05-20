@@ -1,0 +1,61 @@
+name: Build Windows app
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-build.txt
+
+      - name: Build portable app
+        run: |
+          python -m PyInstaller --noconfirm --clean packaging\pyinstaller\TEMEasyCalibrator.spec
+          Compress-Archive -Path "dist\TEM Easy Calibrator\*" -DestinationPath "dist\TEM-Easy-Calibrator-windows-portable.zip" -Force
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $env:APP_VERSION = "${{ github.ref_name }}".TrimStart("v")
+          } else {
+            $env:APP_VERSION = "0.1.0"
+          }
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" packaging\windows\installer.iss
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: TEM-Easy-Calibrator-windows
+          path: |
+            dist/TEM-Easy-Calibrator-windows-portable.zip
+            dist/TEM-Easy-Calibrator-Setup-*.exe
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/TEM-Easy-Calibrator-windows-portable.zip
+            dist/TEM-Easy-Calibrator-Setup-*.exe
