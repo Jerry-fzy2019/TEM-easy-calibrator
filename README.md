@@ -4,6 +4,48 @@ TEM Easy Calibrator 是一个面向透射电子显微镜（TEM）图像的交互
 
 > 说明：本项目定位为科研辅助工具。计算结果应结合样品信息、显微镜条件和人工复核共同判断，不建议作为唯一判定依据。
 
+## 下载与安装
+
+如果只是使用 TEM Easy Calibrator，推荐优先从 [GitHub Releases](https://github.com/Jerry-fzy2019/TEM-easy-calibrator/releases) 下载已打包的 Windows 版本：
+
+- `TEM-Easy-Calibrator-Setup-版本号.exe`：安装器，可安装到系统程序目录并创建快捷方式。
+- `TEM-Easy-Calibrator-windows-portable.zip`：便携版，解压后直接运行。
+
+目前预构建包主要面向 Windows。macOS / Linux 用户可以继续阅读“快速开始”，从源码运行项目。
+
+### 本地打包
+
+Windows PowerShell：
+
+```powershell
+.\scripts\build_windows.ps1
+```
+
+如果只想生成便携版 zip，不生成安装器：
+
+```powershell
+.\scripts\build_windows.ps1 -SkipInstaller
+```
+
+如果需要把 DM3/HyperSpy 支持也打进程序：
+
+```powershell
+.\scripts\build_windows.ps1 -IncludeDm3
+```
+
+> 注意：`-IncludeDm3` 会把 GPLv3 许可证的 HyperSpy 打进发布包。分发该版本时，请同时遵守 HyperSpy 的许可证要求。默认构建不包含 HyperSpy。
+
+### GitHub Actions 自动发布
+
+仓库已包含 `.github/workflows/build-windows.yml`。你可以在 GitHub 页面手动运行 workflow，生成 Windows 便携版和安装器。
+
+如果创建形如 `v0.1.0` 的 tag 并推送到 GitHub，workflow 会自动构建并发布到 GitHub Release：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
 ## 功能特性
 
 | 模块 | 主要能力 |
@@ -82,46 +124,6 @@ python main.py
 ```
 
 该入口会在后台启动 Streamlit 服务，并在本地桌面窗口中打开应用。
-
-## 安装包与发布
-
-为了让非 Python 用户更容易使用，项目提供了 Windows 桌面版打包配置。发布后可以在 GitHub Releases 中提供两种文件：
-
-- `TEM-Easy-Calibrator-windows-portable.zip`：便携版，解压后直接运行。
-- `TEM-Easy-Calibrator-Setup-版本号.exe`：安装器，可安装到系统程序目录并创建快捷方式。
-
-### 本地打包
-
-Windows PowerShell：
-
-```powershell
-.\scripts\build_windows.ps1
-```
-
-如果只想生成便携版 zip，不生成安装器：
-
-```powershell
-.\scripts\build_windows.ps1 -SkipInstaller
-```
-
-如果需要把 DM3/HyperSpy 支持也打进程序：
-
-```powershell
-.\scripts\build_windows.ps1 -IncludeDm3
-```
-
-> 注意：`-IncludeDm3` 会把 GPLv3 许可证的 HyperSpy 打进发布包。分发该版本时，请同时遵守 HyperSpy 的许可证要求。默认构建不包含 HyperSpy。
-
-### GitHub Actions 自动构建
-
-仓库已包含 `.github/workflows/build-windows.yml`。你可以在 GitHub 页面手动运行 workflow，生成 Windows 便携版和安装器。
-
-如果创建形如 `v0.1.0` 的 tag 并推送到 GitHub，workflow 会自动构建并发布到 GitHub Release：
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
 
 ## 基本使用流程
 
