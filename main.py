@@ -67,6 +67,24 @@ def configure_streamlit() -> None:
     os.environ["STREAMLIT_SERVER_HEADLESS"] = "true"
     os.environ["STREAMLIT_THEME_BASE"] = "light"
     os.environ["STREAMLIT_SERVER_FILE_WATCHER_TYPE"] = "none"
+    os.environ["STREAMLIT_GLOBAL_DEVELOPMENT_MODE"] = "false"
+
+
+def apply_streamlit_runtime_config() -> None:
+    """Set Streamlit options directly for embedded/frozen startup."""
+    from streamlit import config as st_config
+
+    options = {
+        "server.port": STREAMLIT_PORT,
+        "server.address": "localhost",
+        "server.headless": True,
+        "server.fileWatcherType": "none",
+        "browser.gatherUsageStats": False,
+        "global.developmentMode": False,
+        "theme.base": "light",
+    }
+    for key, value in options.items():
+        st_config.set_option(key, value)
 
 
 def run_streamlit_server() -> None:
@@ -81,10 +99,13 @@ def run_streamlit_server() -> None:
         if not app_path.exists():
             raise FileNotFoundError(f"Streamlit app was not found: {app_path}")
 
+        apply_streamlit_runtime_config()
+        write_log("Streamlit runtime config applied.")
+
         from streamlit.web import bootstrap
 
         write_log("Streamlit bootstrap imported.")
-        bootstrap.run(str(app_path), False, [], {})
+        bootstrap.run(str(app_path), None, [], {})
     except Exception:
         write_log("Streamlit server failed:\n" + traceback.format_exc())
         raise
@@ -125,7 +146,7 @@ def start_streamlit() -> None:
 
 
 def wait_until_ready(timeout_seconds: float = 60.0) -> bool:
-    url = f"http://localhost:{STREAMLIT_PORT}"
+    url = f"http://localhost:{STREAMLIT_PORT}/_stcore/health"
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
         try:
